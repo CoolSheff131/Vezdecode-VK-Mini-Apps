@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-
+import bridge from '@vkontakte/vk-bridge';
 import {
   Panel,
   PanelHeader,
@@ -36,6 +36,29 @@ const Home = ({ id, go, fetchedUser }) => {
   const [inputNumberOfPlayers, setInputNumberOfPlayers] = React.useState(1);
   const [numberOfSpys, setNumberOfSpys] = React.useState(1);
   const [numberOfSpysToPick, setNumberOfSpysToPick] = React.useState(1);
+  const [seconds, setSeconds] = React.useState(0);
+  const [isStarted, setIsStarted] = React.useState(false);
+  const [timerId, setTimerId] = React.useState(null);
+
+  React.useEffect(() => {
+    if (isStarted) {
+      let timerId = setInterval(() => {
+        if (seconds > 0) {
+          setSeconds((secondsPrev) => secondsPrev - 1);
+        }
+      }, 1000);
+      setTimerId(timerId);
+    }
+  }, [isStarted]);
+
+  React.useEffect(() => {
+    if (seconds == 0) {
+      clearTimeout(timerId);
+    }
+    if (seconds < 5) {
+      bridge.send('VKWebAppFlashSetLevel', { level: 1 });
+    }
+  }, [seconds]);
 
   const isDrawSpy = () => {
     if (numberOfSpysToPick === 0) {
@@ -65,6 +88,9 @@ const Home = ({ id, go, fetchedUser }) => {
   };
 
   const submitLocation = () => {
+    if (numberOfPlayersToPickCard - 1 === 0) {
+      setIsStarted(true);
+    }
     setNumberOfPlayersToPickCard(numberOfPlayersToPickCard - 1);
     setIsPickingLocation(true);
   };
@@ -72,6 +98,7 @@ const Home = ({ id, go, fetchedUser }) => {
   const submitNumberOfPlayers = (numberOfPlayers) => {
     setNumberOfPlayers(numberOfPlayers);
     setNumberOfPlayersToPickCard(numberOfPlayers);
+    setSeconds(60 * numberOfPlayers);
     if (numberOfPlayers > 6) {
       setNumberOfSpys(2);
       setNumberOfSpysToPick(2);
@@ -95,83 +122,85 @@ const Home = ({ id, go, fetchedUser }) => {
       )}
 
       <Group header={<Header mode="secondary">Локации</Header>}>
-        {!numberOfPlayers && (
-          <>
-            <h1>Введите количество игроков</h1>
-            <FormItem top="Количество игроков">
-              <Input
-                type="number"
-                value={inputNumberOfPlayers}
-                onChange={(e) => {
-                  if (Number.isInteger(+e.target.value)) {
-                    setInputNumberOfPlayers(e.target.value);
-                  }
-                }}
-                disabled={false}
-                inputMode="numeric"
-              />
-            </FormItem>
-            <FormItem top="Подтвердить">
-              <Input
-                onClick={() => submitNumberOfPlayers(inputNumberOfPlayers)}
-                type="button"
-                defaultValue="Подтвердить"
-                disabled={false}
-              />
-            </FormItem>
-          </>
-        )}
-
-        {numberOfPlayers && (
-          <>
-            <h1>Осталось игроков для выдачи карт {numberOfPlayersToPickCard} </h1>
-            {numberOfPlayersToPickCard && (
-              <>
-                {!isPickingLocation && (
-                  <>
-                    <h2>Ваша локация</h2>
-                    <h1>{pickedLocation}</h1>
-                    <FormItem top="Передайте другому игроку телефон">
-                      <Input
-                        onClick={() => submitLocation()}
-                        type="button"
-                        defaultValue="Подтвердить"
-                        disabled={false}
-                      />
-                    </FormItem>
-                  </>
-                )}
-                {isPickingLocation && (
-                  <>
-                    <FormItem top="Локация">
-                      <Input
-                        onClick={() => pickLocation()}
-                        type="button"
-                        defaultValue="Показать мою локацию"
-                        disabled={false}
-                      />
-                    </FormItem>
-                  </>
-                )}
-              </>
-            )}
-
-            {!numberOfPlayersToPickCard && (
-              <>
-                <h1>Все игроки взяли карту</h1>
-              </>
-            )}
-          </>
-        )}
-
-        {allLocations.map((location) => {
-          return <h1 key={location}>{location}</h1>;
-        })}
-
         <Div>
-          <Button stretched size="l" mode="secondary" onClick={go} data-to="persik">
-            Show me the Persik, please
-          </Button>
+          {!numberOfPlayers && (
+            <>
+              <h1>Введите количество игроков</h1>
+              <FormItem top="Количество игроков">
+                <Input
+                  type="number"
+                  value={inputNumberOfPlayers}
+                  onChange={(e) => {
+                    if (Number.isInteger(+e.target.value)) {
+                      setInputNumberOfPlayers(e.target.value);
+                    }
+                  }}
+                  disabled={false}
+                  inputMode="numeric"
+                />
+              </FormItem>
+              <FormItem top="Подтвердить">
+                <Input
+                  onClick={() => submitNumberOfPlayers(inputNumberOfPlayers)}
+                  type="button"
+                  defaultValue="Подтвердить"
+                  disabled={false}
+                />
+              </FormItem>
+            </>
+          )}
+
+          {numberOfPlayers && (
+            <>
+              <h1>Осталось игроков для выдачи карт {numberOfPlayersToPickCard} </h1>
+              {numberOfPlayersToPickCard && (
+                <>
+                  {!isPickingLocation && (
+                    <>
+                      <h2>Ваша локация</h2>
+                      <h1>{pickedLocation}</h1>
+                      <FormItem top="Передайте другому игроку телефон">
+                        <Input
+                          onClick={() => submitLocation()}
+                          type="button"
+                          defaultValue="Подтвердить"
+                          disabled={false}
+                        />
+                      </FormItem>
+                    </>
+                  )}
+                  {isPickingLocation && (
+                    <>
+                      <FormItem top="Локация">
+                        <Input
+                          onClick={() => pickLocation()}
+                          type="button"
+                          defaultValue="Показать мою локацию"
+                          disabled={false}
+                        />
+                      </FormItem>
+                    </>
+                  )}
+                </>
+              )}
+
+              {!numberOfPlayersToPickCard && (
+                <>
+                  <h1>Все игроки взяли карту</h1>
+                </>
+              )}
+
+              {isStarted && (
+                <>
+                  <h1>Оставшееся время: {seconds} c.</h1>
+                </>
+              )}
+            </>
+          )}
+
+          {allLocations.map((location) => {
+            return <h1 key={location}>{location}</h1>;
+          })}
         </Div>
       </Group>
     </Panel>
