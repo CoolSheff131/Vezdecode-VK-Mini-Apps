@@ -210,8 +210,6 @@ const Home = ({ id, go, fetchedUser }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader>Example</PanelHeader>
-
       <Group>
         <Div>
           {!numberOfPlayers && (
