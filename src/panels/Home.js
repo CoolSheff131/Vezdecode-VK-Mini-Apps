@@ -11,7 +11,9 @@ import {
   Div,
   Input,
   FormItem,
+  Switch,
   Avatar,
+  SimpleCell,
 } from '@vkontakte/vkui';
 
 const Home = ({ id, go, fetchedUser }) => {
@@ -39,6 +41,17 @@ const Home = ({ id, go, fetchedUser }) => {
   const [seconds, setSeconds] = React.useState(0);
   const [isStarted, setIsStarted] = React.useState(false);
   const [timerId, setTimerId] = React.useState(null);
+
+  const [errorFormText, setErrorFormText] = React.useState(null);
+  const [locationFormText, setLocationFormText] = React.useState('');
+  const [isAddingLocation, setIsAddingLocation] = React.useState(true);
+  const [indexOfChangingLocation, setIndexOfChangingLocation] = React.useState(0);
+
+  const [playerNameFormText, setPlayerNameFormText] = React.useState('');
+  const [players, setPlayers] = React.useState([]);
+  const [isShowPlayersLocation, setIsShowPlayersLocation] = React.useState(false);
+  const [errorNumberOfPlayerText, setErrorNumberOfPlayerText] = React.useState('');
+  const [isValidNumberOfPlayers, setIsValidNumberOfPlayers] = React.useState(true);
 
   React.useEffect(() => {
     if (isStarted) {
@@ -80,10 +93,19 @@ const Home = ({ id, go, fetchedUser }) => {
         locationsToDraw[Math.floor(Math.random() * locationsToDraw.length)];
       setPickedLocation(randomPickedLocation);
       setLocationsToDraw(locationsToDraw.filter((location) => randomPickedLocation !== location));
+      setPlayers((playersPrev) => [
+        ...playersPrev,
+        { name: playerNameFormText, location: randomPickedLocation },
+      ]);
     } else {
       setPickedLocation('Вы шпион');
       setNumberOfSpysToPick(numberOfSpysToPick - 1);
+      setPlayers((playersPrev) => [
+        ...playersPrev,
+        { name: playerNameFormText, location: 'Шпион' },
+      ]);
     }
+    setPlayerNameFormText('');
     setIsPickingLocation(false);
   };
 
@@ -108,43 +130,158 @@ const Home = ({ id, go, fetchedUser }) => {
     }
   };
 
+  const addLocation = () => {
+    if (!locationFormText) {
+      setErrorFormText('Поле не должно быть пустым');
+      return;
+    } else {
+      setErrorFormText('');
+    }
+    const isSameLocationName = allLocations.filter((location) => location == locationFormText);
+    console.log(isSameLocationName.length > 0);
+    if (isSameLocationName.length > 0) {
+      setErrorFormText('Такое название локации уже существет!');
+    } else {
+      setAllLocations([...allLocations, locationFormText]);
+      setLocationFormText('');
+      setErrorFormText('');
+    }
+  };
+
+  const startChangeLocation = (locationName) => {
+    const index = allLocations.indexOf(locationName);
+    setIndexOfChangingLocation(index);
+    setLocationFormText(locationName);
+    setIsAddingLocation(false);
+  };
+
+  const changeLocation = () => {
+    const isSameLocationName = allLocations.filter((location) => location == locationFormText);
+
+    if (isSameLocationName.length > 0) {
+      setErrorFormText('Такое название локации уже существет!');
+    } else {
+      const copyArr = [...allLocations];
+      copyArr[indexOfChangingLocation] = locationFormText;
+      setAllLocations([...copyArr]);
+      setLocationFormText('');
+      setErrorFormText('');
+      setIsAddingLocation(true);
+    }
+  };
+
+  const cancelChangeLocation = () => {
+    setLocationFormText('');
+    setErrorFormText('');
+    setIsAddingLocation(true);
+  };
+
+  const deleteLocation = (locationName) => {
+    setAllLocations(allLocations.filter((location) => locationName !== location));
+  };
+
+  const checkNumberOfPlayers = React.useCallback(
+    (number) => {
+      if (!Number.isInteger(number)) {
+        return setErrorNumberOfPlayerText('Число игроков должно быть целым');
+      }
+      if (number < 1) {
+        setInputNumberOfPlayers(1);
+        return setErrorNumberOfPlayerText('Число игроков должно быть положительным');
+      }
+      if (number > locationsToDraw.length) {
+        setInputNumberOfPlayers(locationsToDraw.length);
+        return setErrorNumberOfPlayerText('Число игроков должно быть меньше числа локаций');
+      }
+      setInputNumberOfPlayers(number);
+      setErrorNumberOfPlayerText('');
+    },
+    [locationsToDraw],
+  );
+
+  React.useEffect(() => {
+    checkNumberOfPlayers(inputNumberOfPlayers);
+  }, [locationsToDraw]);
+
+  const onNumberOfPlayersChange = (e) => {
+    const value = +e.target.value;
+    checkNumberOfPlayers(value);
+  };
+
   return (
     <Panel id={id}>
       <PanelHeader>Example</PanelHeader>
-      {fetchedUser && (
-        <Group header={<Header mode="secondary">User Data Fetched with VK Bridge</Header>}>
-          <Cell
-            before={fetchedUser.photo_200 ? <Avatar src={fetchedUser.photo_200} /> : null}
-            description={fetchedUser.city && fetchedUser.city.title ? fetchedUser.city.title : ''}>
-            {`${fetchedUser.first_name} ${fetchedUser.last_name}`}
-          </Cell>
-        </Group>
-      )}
 
-      <Group header={<Header mode="secondary">Локации</Header>}>
+      <Group>
         <Div>
           {!numberOfPlayers && (
             <>
+              <Div>
+                <FormItem top="Название локации">
+                  <Input
+                    type="text"
+                    value={locationFormText}
+                    onChange={(e) => {
+                      setLocationFormText(e.target.value);
+                    }}
+                    disabled={false}
+                  />
+                </FormItem>
+                <FormItem>
+                  {errorFormText}
+                  {!isAddingLocation && (
+                    <Input
+                      onClick={() => cancelChangeLocation()}
+                      type="button"
+                      defaultValue="Отменить"
+                      disabled={false}
+                    />
+                  )}
+                  <Input
+                    onClick={() => (isAddingLocation ? addLocation() : changeLocation())}
+                    type="button"
+                    defaultValue={isAddingLocation ? 'Добавить' : 'Изменить'}
+                    disabled={false}
+                  />
+                </FormItem>
+                <h1>Все локации</h1>
+                <ul>
+                  {allLocations.map((location) => {
+                    return (
+                      <li
+                        key={location}
+                        style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{location}</span>
+                        <div>
+                          <Button mode="secondary" onClick={() => startChangeLocation(location)}>
+                            Изменить
+                          </Button>
+                          <Button mode="secondary" onClick={() => deleteLocation(location)}>
+                            Удалить
+                          </Button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Div>
               <h1>Введите количество игроков</h1>
               <FormItem top="Количество игроков">
                 <Input
                   type="number"
                   value={inputNumberOfPlayers}
-                  onChange={(e) => {
-                    if (Number.isInteger(+e.target.value)) {
-                      setInputNumberOfPlayers(e.target.value);
-                    }
-                  }}
+                  onChange={onNumberOfPlayersChange}
                   disabled={false}
                   inputMode="numeric"
                 />
               </FormItem>
+              {errorNumberOfPlayerText}
               <FormItem top="Подтвердить">
                 <Input
                   onClick={() => submitNumberOfPlayers(inputNumberOfPlayers)}
                   type="button"
                   defaultValue="Подтвердить"
-                  disabled={false}
+                  disabled={errorNumberOfPlayerText}
                 />
               </FormItem>
             </>
@@ -157,7 +294,7 @@ const Home = ({ id, go, fetchedUser }) => {
                 <>
                   {!isPickingLocation && (
                     <>
-                      <h2>Ваша локация</h2>
+                      <span>Ваша локация:</span>
                       <h1>{pickedLocation}</h1>
                       <FormItem top="Передайте другому игроку телефон">
                         <Input
@@ -171,12 +308,22 @@ const Home = ({ id, go, fetchedUser }) => {
                   )}
                   {isPickingLocation && (
                     <>
-                      <FormItem top="Локация">
+                      <FormItem top="Введите название игрока">
+                        <Input
+                          type="text"
+                          value={playerNameFormText}
+                          onChange={(e) => {
+                            setPlayerNameFormText(e.target.value);
+                          }}
+                          disabled={false}
+                        />
+                      </FormItem>
+                      <FormItem top={!playerNameFormText && 'Введите имя!'}>
                         <Input
                           onClick={() => pickLocation()}
                           type="button"
                           defaultValue="Показать мою локацию"
-                          disabled={false}
+                          disabled={!playerNameFormText}
                         />
                       </FormItem>
                     </>
@@ -186,7 +333,24 @@ const Home = ({ id, go, fetchedUser }) => {
 
               {!numberOfPlayersToPickCard && (
                 <>
-                  <h1>Все игроки взяли карту</h1>
+                  <SimpleCell
+                    Component="label"
+                    after={
+                      <Switch
+                        value={isShowPlayersLocation}
+                        onChange={(e) => setIsShowPlayersLocation((prev) => !prev)}
+                      />
+                    }>
+                    Показать локации игроков
+                  </SimpleCell>
+
+                  <h1>Все игроки:</h1>
+                  {players.map((player) => (
+                    <div key={player.location}>
+                      {player.name}
+                      {isShowPlayersLocation && `: ${player.location}`}
+                    </div>
+                  ))}
                 </>
               )}
 
@@ -197,10 +361,6 @@ const Home = ({ id, go, fetchedUser }) => {
               )}
             </>
           )}
-
-          {allLocations.map((location) => {
-            return <h1 key={location}>{location}</h1>;
-          })}
         </Div>
       </Group>
     </Panel>
